@@ -5,7 +5,7 @@ import { Lightbox } from './components/Lightbox';
 import { Admin } from './components/Admin';
 import { Toaster, toast } from 'sonner';
 import { portfolioService } from './services/portfolioService';
-import { Iconoir } from 'iconoir-react';
+import { Instagram, Mail } from 'iconoir-react';
 
 export default function App() {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -199,8 +199,8 @@ export default function App() {
               Visual Storyteller & Photographer
             </p>
             <div className="flex gap-6">
-              <a href="#" className="hover:text-white/60 transition-colors"><Iconoir name="instagram" width={20} height={20} /></a>
-              <a href="#" className="hover:text-white/60 transition-colors"><Iconoir name="email" width={20} height={20} /></a>
+              <a href="#" className="hover:text-white/60 transition-colors"><Instagram width={20} height={20} /></a>
+              <a href="#" className="hover:text-white/60 transition-colors"><Mail width={20} height={20} /></a>
             </div>
           </div>
           
