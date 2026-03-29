@@ -26,7 +26,49 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
     reader.readAsDataURL(file);
   });
-const getAuthToken = (): string | null => sessionStorage.getItem('cyan_admin_token');
+/** Persists across iOS PWA launches; sessionStorage did not. */
+const ADMIN_TOKEN_KEY = 'cyan_admin_token';
+
+const readStoredToken = (): string | null => {
+  try {
+    const persisted = localStorage.getItem(ADMIN_TOKEN_KEY);
+    if (persisted) return persisted;
+    const legacy = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+    if (legacy) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, legacy);
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+      return legacy;
+    }
+    return null;
+  } catch {
+    try {
+      return sessionStorage.getItem(ADMIN_TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  }
+};
+
+const writeStoredToken = (token: string | null): void => {
+  try {
+    if (token) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, token);
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    } else {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    }
+  } catch {
+    try {
+      if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+      else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    } catch {
+      /* storage unavailable (e.g. locked down mode) */
+    }
+  }
+};
+
+const getAuthToken = (): string | null => readStoredToken();
 
 const jsonHeaders = (): HeadersInit => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -226,11 +268,8 @@ export const portfolioService = {
 };
 
 export const authStorage = {
-  getToken: getAuthToken,
-  setToken: (token: string | null) => {
-    if (token) sessionStorage.setItem('cyan_admin_token', token);
-    else sessionStorage.removeItem('cyan_admin_token');
-  },
+  getToken: readStoredToken,
+  setToken: writeStoredToken,
 };
 
 export const authApi = {
