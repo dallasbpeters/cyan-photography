@@ -1,1 +1,42 @@
-{"theme_color":"#000000","background_color":"#000000","icons":[{"purpose":"maskable","sizes":"512x512","src":"icon512_maskable.png","type":"image/png"},{"purpose":"any","sizes":"512x512","src":"icon512_rounded.png","type":"image/png"}],"orientation":"any","display":"standalone","dir":"auto","lang":"en-US","name":"Cyan's Photos","short_name":"Cyan's Photos","start_url":"https://cyansphotos.com","scope":"https://cyansphotos.com","id":"https://cyansphotos.com"}
+{
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "purpose": "maskable",
+      "sizes": "512x512",
+      "src": "icon512_maskable.png",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any",
+      "sizes": "512x512",
+      "src": "icon512_rounded.png",
+      "type": "image/png"
+    }
+  ],
+  "orientation": "any",
+  "display": "standalone",
+  "dir": "auto",
+  "lang": "en-US",
+  "name": "Cyan's Photos",
+  "short_name": "Cyan's Photos",
+  "id": "https://cyansphotos.com",
+  "start_url": "/",
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Admin",
+      "short_name": "Admin",
+      "description": "Manage portfolio and uploads",
+      "url": "/admin",
+      "icons": [
+        {
+          "src": "icon512_rounded.png",
+          "sizes": "512x512",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
