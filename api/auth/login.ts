@@ -45,8 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (msg.includes('JWT_SECRET')) {
       return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
     }
-    if (msg.includes('DATABASE_URL')) {
-      return res.status(500).json({ error: 'DATABASE_URL is not configured.' });
+    if (msg.includes('DATABASE_URL') || msg.includes('Missing database URL')) {
+      return res.status(500).json({ error: 'Database connection is not configured.' });
     }
     return res.status(500).json({ error: 'Login failed' });
   }

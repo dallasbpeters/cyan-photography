@@ -20,6 +20,12 @@ export type PhotoDto = {
   createdAt: string;
 };
 
+const toIso = (value: string | Date): string => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return new Date(0).toISOString();
+  return d.toISOString();
+};
+
 export const rowToDto = (row: PhotoRow): PhotoDto => ({
   id: row.id,
   url: row.url,
@@ -27,6 +33,6 @@ export const rowToDto = (row: PhotoRow): PhotoDto => ({
   categoryId: row.category_id,
   category: row.category_slug,
   categoryLabel: row.category_label,
-  order: row.sort_order,
-  createdAt: new Date(row.created_at).toISOString(),
+  order: Number(row.sort_order),
+  createdAt: toIso(row.created_at),
 });

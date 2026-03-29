@@ -13,6 +13,13 @@ const isDev =
 
 const mapDbError = (e: NeonDbError): { status: number; error: string } | null => {
   const code = e.code;
+  if (code === '42P01' || code === '42703') {
+    return {
+      status: 503,
+      error:
+        'Database schema is missing or out of date. Run migrations (pnpm db:migrate) against the database used by this deployment.',
+    };
+  }
   if (code === '23503') {
     if (e.constraint?.includes('created_by')) {
       return {
@@ -114,13 +121,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
     console.error(e);
+    const message = e instanceof Error ? e.message : '';
+    if (message.includes('Missing database URL') || message.includes('DATABASE_URL')) {
+      return res.status(503).json({
+        error:
+          'Database is not configured for this deployment. Add DATABASE_URL or connect Neon/Postgres on Vercel.',
+      });
+    }
     if (e instanceof NeonDbError) {
       const mapped = mapDbError(e);
       if (mapped) {
         return res.status(mapped.status).json({ error: mapped.error });
       }
     }
-    const message = e instanceof Error ? e.message : '';
     return res.status(500).json({
       error: 'Request failed',
       ...(isDev && message ? { debug: message } : {}),
