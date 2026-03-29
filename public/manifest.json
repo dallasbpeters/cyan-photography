@@ -22,14 +22,14 @@
   "name": "Cyan's Photos",
   "short_name": "Cyan's Photos",
   "id": "https://cyansphotos.com",
-  "start_url": "/",
+  "start_url": "/admin",
   "scope": "/",
   "shortcuts": [
     {
-      "name": "Admin",
-      "short_name": "Admin",
-      "description": "Manage portfolio and uploads",
-      "url": "/admin",
+      "name": "Portfolio",
+      "short_name": "Home",
+      "description": "Public gallery",
+      "url": "/",
       "icons": [
         {
           "src": "icon512_rounded.png",
