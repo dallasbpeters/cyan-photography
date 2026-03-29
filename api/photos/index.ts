@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { NeonDbError } from '@neondatabase/serverless';
-import { getSql } from '../_lib/db';
-import { getBearerUser } from '../_lib/auth';
-import { handleCors } from '../_lib/cors';
-import { rowToDto, type PhotoRow } from '../_lib/photos';
-import { parseJsonBody } from '../_lib/parseBody';
-import { parsePublicHttpUrl, sanitizeText } from '../_lib/httpUrl';
+import { getSql } from '../_lib/db.js';
+import { getBearerUser } from '../_lib/auth.js';
+import { handleCors } from '../_lib/cors.js';
+import { rowToDto, type PhotoRow } from '../_lib/photos.js';
+import { parseJsonBody } from '../_lib/parseBody.js';
+import { parsePublicHttpUrl, sanitizeText } from '../_lib/httpUrl.js';
 
 const isDev =
   process.env.VERCEL_ENV === 'development' ||

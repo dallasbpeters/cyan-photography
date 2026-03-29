@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSql } from '../_lib/db';
-import { getBearerUser } from '../_lib/auth';
-import { handleCors } from '../_lib/cors';
-import { parseJsonBody } from '../_lib/parseBody';
-import { rowToDto, type PhotoRow } from '../_lib/photos';
+import { getSql } from '../_lib/db.js';
+import { getBearerUser } from '../_lib/auth.js';
+import { handleCors } from '../_lib/cors.js';
+import { parseJsonBody } from '../_lib/parseBody.js';
+import { rowToDto, type PhotoRow } from '../_lib/photos.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;

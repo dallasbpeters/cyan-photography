@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSql } from '../_lib/db';
-import { signToken, verifyPassword } from '../_lib/auth';
-import { handleCors } from '../_lib/cors';
-import { parseJsonBody } from '../_lib/parseBody';
+import { getSql } from '../_lib/db.js';
+import { signToken, verifyPassword } from '../_lib/auth.js';
+import { handleCors } from '../_lib/cors.js';
+import { parseJsonBody } from '../_lib/parseBody.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;

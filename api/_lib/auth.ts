@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { bootstrapEnv } from './bootstrapEnv';
+import { bootstrapEnv } from './bootstrapEnv.js';
 
 bootstrapEnv();
 

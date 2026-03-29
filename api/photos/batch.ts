@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getSql } from '../_lib/db';
-import { getBearerUser } from '../_lib/auth';
-import { handleCors } from '../_lib/cors';
-import { parseJsonBody } from '../_lib/parseBody';
+import { getSql } from '../_lib/db.js';
+import { getBearerUser } from '../_lib/auth.js';
+import { handleCors } from '../_lib/cors.js';
+import { parseJsonBody } from '../_lib/parseBody.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

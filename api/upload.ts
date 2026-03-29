@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { put } from '@vercel/blob';
-import { getBearerUser } from './_lib/auth';
-import { handleCors } from './_lib/cors';
-import { parseJsonBody } from './_lib/parseBody';
+import { getBearerUser } from './_lib/auth.js';
+import { handleCors } from './_lib/cors.js';
+import { parseJsonBody } from './_lib/parseBody.js';
 
 const MAX_BYTES = 8 * 1024 * 1024;
 
