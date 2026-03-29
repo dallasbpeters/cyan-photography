@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `;
 
     const row = rows[0] as { id: string; email: string; password_hash: string } | undefined;
-    if (!row || !verifyPassword(password, row.password_hash)) {
+    if (!row || !(await verifyPassword(password, row.password_hash))) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 

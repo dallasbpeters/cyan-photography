@@ -9,10 +9,13 @@ loadEnv();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString =
+  process.env.DATABASE_URL?.trim() ||
+  process.env.POSTGRES_URL?.trim() ||
+  process.env.POSTGRES_PRISMA_URL?.trim();
 if (!connectionString) {
   throw new Error(
-    'DATABASE_URL is required (Neon connection string in .env, .env.local, or .env.development.local)',
+    'DATABASE_URL (or POSTGRES_URL / POSTGRES_PRISMA_URL) is required (Neon connection string in .env, .env.local, or .env.development.local)',
   );
 }
 

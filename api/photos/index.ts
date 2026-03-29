@@ -9,7 +9,7 @@ import { parsePublicHttpUrl, sanitizeText } from '../_lib/httpUrl.js';
 
 const isDev =
   process.env.VERCEL_ENV === 'development' ||
-  process.env.NODE_ENV !== 'production';
+  (process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV);
 
 const mapDbError = (e: NeonDbError): { status: number; error: string } | null => {
   const code = e.code;

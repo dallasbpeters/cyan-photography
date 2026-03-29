@@ -8,16 +8,15 @@ const defaultOrigins = [
 ];
 
 const allowedOrigins = (): Set<string> => {
-  const raw = process.env.CORS_ALLOWED_ORIGINS;
-  if (raw?.trim()) {
-    return new Set(
-      raw
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-    );
+  const extras = process.env.CORS_ALLOWED_ORIGINS;
+  const origins = new Set(defaultOrigins);
+  if (extras?.trim()) {
+    for (const s of extras.split(',')) {
+      const trimmed = s.trim();
+      if (trimmed) origins.add(trimmed);
+    }
   }
-  return new Set(defaultOrigins);
+  return origins;
 };
 
 /**

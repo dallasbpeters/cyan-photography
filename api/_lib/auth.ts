@@ -6,11 +6,11 @@ bootstrapEnv();
 
 const BCRYPT_ROUNDS = 10;
 
-export const hashPassword = (plain: string): string =>
-  bcrypt.hashSync(plain, BCRYPT_ROUNDS);
+export const hashPassword = async (plain: string): Promise<string> =>
+  bcrypt.hash(plain, BCRYPT_ROUNDS);
 
-export const verifyPassword = (plain: string, hash: string): boolean =>
-  bcrypt.compareSync(plain, hash);
+export const verifyPassword = async (plain: string, hash: string): Promise<boolean> =>
+  bcrypt.compare(plain, hash);
 
 export const signToken = (payload: { sub: string; email: string }): string => {
   const secret = process.env.JWT_SECRET;

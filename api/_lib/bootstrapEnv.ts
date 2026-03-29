@@ -20,7 +20,7 @@ export const bootstrapEnv = (): void => {
   for (const name of ['.env', '.env.local', '.env.development.local']) {
     const path = resolve(cwd, name);
     if (existsSync(path)) {
-      config({ path, override: true });
+      config({ path });
     }
   }
 };

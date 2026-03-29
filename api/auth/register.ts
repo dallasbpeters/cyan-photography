@@ -1,8 +1,16 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSql } from '../_lib/db.js';
 import { hashPassword } from '../_lib/auth.js';
 import { handleCors } from '../_lib/cors.js';
 import { parseJsonBody } from '../_lib/parseBody.js';
+
+const safeEqual = (a: string, b: string): boolean => {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -25,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const password = typeof body.password === 'string' ? body.password : '';
     const secret = typeof body.setupSecret === 'string' ? body.setupSecret : '';
 
-    if (secret !== setupSecret) {
+    if (!safeEqual(secret, setupSecret)) {
       return res.status(403).json({ error: 'Invalid setup secret' });
     }
 
@@ -43,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(409).json({ error: 'Email already registered' });
     }
 
-    const passwordHash = hashPassword(password);
+    const passwordHash = await hashPassword(password);
     const inserted = await sql`
       INSERT INTO users (email, password_hash)
       VALUES (${email}, ${passwordHash})
