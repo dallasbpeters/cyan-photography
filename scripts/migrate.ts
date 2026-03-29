@@ -26,6 +26,8 @@ try {
   await client.query(schemaSql);
   const patchSql = readFileSync(join(root, 'db/patches/001_legacy_photo_categories.sql'), 'utf8');
   await client.query(patchSql);
+  const patch2 = readFileSync(join(root, 'db/patches/002_daily_challenge.sql'), 'utf8');
+  await client.query(patch2);
   console.log('Migration finished.');
 } finally {
   await client.end();

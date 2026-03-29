@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Trash2, Plus, LogOut, LogIn, Shield, Pencil, FilePenLine, Tags, Upload } from 'lucide-react';
 import { CategoryPicker } from './admin/CategoryPicker';
 import { CategoriesManageDialog } from './admin/CategoriesManageDialog';
+import { DailyChallengePanel } from './admin/DailyChallengePanel';
 import { PhotoEditor } from './PhotoEditor';
 import { toast } from 'sonner';
 import { authApi, authStorage, portfolioService } from '../services/portfolioService';
@@ -439,6 +440,8 @@ export const Admin = () => {
         onCreate={createCategoryFromLabel}
         onDelete={(cat) => void handleDeleteCategory(cat)}
       />
+
+      <DailyChallengePanel />
 
       <Card className="bg-white/5 border-white/10">
         <CardHeader>

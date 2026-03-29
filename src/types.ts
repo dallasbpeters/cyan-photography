@@ -20,3 +20,24 @@ export interface Photo {
 }
 
 export type ViewMode = 'all' | string;
+
+export type DailyChallengeInfo = {
+  challengeDate: string;
+  imageUrl: string;
+  imageThumbUrl: string | null;
+  photographerName: string | null;
+  photographerUsername: string | null;
+  unsplashPhotoId: string | null;
+  unsplashHtmlLink: string | null;
+  altText: string | null;
+};
+
+export type DailyChallengeJournal = {
+  body: string;
+  updatedAt: string;
+};
+
+export type DailyChallengeResponse = {
+  challenge: DailyChallengeInfo;
+  journal: DailyChallengeJournal | null;
+};

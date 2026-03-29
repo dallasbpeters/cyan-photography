@@ -1,4 +1,4 @@
-import type { Category, Photo } from '../types';
+import type { Category, DailyChallengeJournal, DailyChallengeResponse, Photo } from '../types';
 
 const apiBase = (): string => {
   if (import.meta.env.DEV && import.meta.env.VITE_USE_LOCAL_API === '1') {
@@ -14,6 +14,7 @@ const apiBase = (): string => {
 const photosPath = (): string => `${apiBase()}/api/photos`;
 const categoriesPath = (): string => `${apiBase()}/api/categories`;
 const uploadPath = (): string => `${apiBase()}/api/upload`;
+const dailyChallengePath = (): string => `${apiBase()}/api/daily-challenge`;
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -236,6 +237,34 @@ export const portfolioService = {
     if (res.status === 204 || res.status === 404) return;
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(data.error || 'Could not delete photo');
+  },
+
+  getDailyChallenge: async (): Promise<DailyChallengeResponse> => {
+    const res = await fetch(dailyChallengePath(), { headers: jsonHeaders() });
+    const data = (await res.json().catch(() => ({}))) as DailyChallengeResponse & { error?: string };
+    if (!res.ok) {
+      throw new Error(data.error || 'Could not load daily challenge');
+    }
+    return data as DailyChallengeResponse;
+  },
+
+  saveDailyChallengeJournal: async (body: string): Promise<DailyChallengeJournal> => {
+    const res = await fetch(dailyChallengePath(), {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ body }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      journal?: DailyChallengeJournal;
+      error?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || 'Could not save journal');
+    }
+    if (!data.journal) {
+      throw new Error('Invalid response from server');
+    }
+    return data.journal;
   },
 
   updatePhoto: async (
