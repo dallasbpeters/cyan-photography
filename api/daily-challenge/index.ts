@@ -37,6 +37,41 @@ const rowToChallengeJson = (row: ChallengeRow) => ({
   altText: row.alt_text,
 });
 
+const respondWithChallengeAndJournal = async (
+  sql: ReturnType<typeof getSql>,
+  user: { userId: string; email: string },
+  dateStr: string,
+  res: VercelResponse,
+  status: number,
+): Promise<void> => {
+  const rows = (await sql`
+    SELECT challenge_date, image_url, image_thumb_url, photographer_name, photographer_username,
+      unsplash_photo_id, unsplash_html_link, alt_text
+    FROM daily_challenges
+    WHERE challenge_date = ${dateStr}::date
+    LIMIT 1
+  `) as ChallengeRow[];
+  const challenge = rows[0];
+  if (!challenge) {
+    res.status(500).json({ error: 'Could not load daily challenge' });
+    return;
+  }
+  const journalRows = (await sql`
+    SELECT body, updated_at
+    FROM challenge_journal_entries
+    WHERE user_id = ${user.userId}::uuid AND challenge_date = ${dateStr}::date
+    LIMIT 1
+  `) as JournalRow[];
+  const j = journalRows[0];
+  const journal = j
+    ? { body: j.body, updatedAt: new Date(j.updated_at).toISOString() }
+    : null;
+  res.status(status).json({
+    challenge: rowToChallengeJson(challenge),
+    journal,
+  });
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
@@ -59,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `) as ChallengeRow[];
 
       if (rows.length === 0) {
-        const photo = await fetchUnsplashDailyPhoto();
+        const photo = await fetchUnsplashDailyPhoto('initial');
         await sql`
           INSERT INTO daily_challenges (
             challenge_date, image_url, image_thumb_url, photographer_name, photographer_username,
@@ -112,6 +147,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    if (req.method === 'POST') {
+      const photo = await fetchUnsplashDailyPhoto('refresh');
+      await sql`
+        INSERT INTO daily_challenges (
+          challenge_date, image_url, image_thumb_url, photographer_name, photographer_username,
+          unsplash_photo_id, unsplash_html_link, alt_text
+        )
+        VALUES (
+          ${dateStr}::date,
+          ${photo.imageUrl},
+          ${photo.imageThumbUrl},
+          ${photo.photographerName},
+          ${photo.photographerUsername},
+          ${photo.unsplashPhotoId},
+          ${photo.unsplashHtmlLink},
+          ${photo.altText}
+        )
+        ON CONFLICT (challenge_date) DO UPDATE SET
+          image_url = EXCLUDED.image_url,
+          image_thumb_url = EXCLUDED.image_thumb_url,
+          photographer_name = EXCLUDED.photographer_name,
+          photographer_username = EXCLUDED.photographer_username,
+          unsplash_photo_id = EXCLUDED.unsplash_photo_id,
+          unsplash_html_link = EXCLUDED.unsplash_html_link,
+          alt_text = EXCLUDED.alt_text
+      `;
+      await respondWithChallengeAndJournal(sql, user, dateStr, res, 200);
+      return;
+    }
+
     if (req.method === 'PUT') {
       const body = parseJsonBody(req.body);
       const raw =
@@ -155,7 +220,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    res.setHeader('Allow', 'GET, PUT');
+    res.setHeader('Allow', 'GET, POST, PUT');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
     console.error(e);

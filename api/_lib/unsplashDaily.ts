@@ -81,11 +81,18 @@ const mapJson = (json: UnsplashRandomJson): DailyInspirationPhoto | null => {
   };
 };
 
-export const fetchUnsplashDailyPhoto = async (): Promise<DailyInspirationPhoto> => {
+const randomFallback = (): DailyInspirationPhoto =>
+  FALLBACK_BY_DAY[Math.floor(Math.random() * FALLBACK_BY_DAY.length)]!;
+
+/** `refresh` picks a random fallback when no API key so “new photo” works without Unsplash. */
+export const fetchUnsplashDailyPhoto = async (
+  mode: 'initial' | 'refresh' = 'initial',
+): Promise<DailyInspirationPhoto> => {
   const key = process.env.UNSPLASH_ACCESS_KEY?.trim();
+  const fallbackNoKey = (): DailyInspirationPhoto =>
+    mode === 'refresh' ? randomFallback() : pickFallbackForDate(new Date().toISOString().slice(0, 10));
   if (!key) {
-    const d = new Date().toISOString().slice(0, 10);
-    return pickFallbackForDate(d);
+    return fallbackNoKey();
   }
 
   const url =
@@ -95,13 +102,13 @@ export const fetchUnsplashDailyPhoto = async (): Promise<DailyInspirationPhoto> 
   });
   if (!res.ok) {
     const d = new Date().toISOString().slice(0, 10);
-    return pickFallbackForDate(d);
+    return mode === 'refresh' ? randomFallback() : pickFallbackForDate(d);
   }
   const json = (await res.json()) as UnsplashRandomJson;
   const mapped = mapJson(json);
   if (!mapped) {
     const d = new Date().toISOString().slice(0, 10);
-    return pickFallbackForDate(d);
+    return mode === 'refresh' ? randomFallback() : pickFallbackForDate(d);
   }
 
   if (mapped.downloadLocation) {

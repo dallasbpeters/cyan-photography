@@ -248,6 +248,18 @@ export const portfolioService = {
     return data as DailyChallengeResponse;
   },
 
+  refreshDailyChallenge: async (): Promise<DailyChallengeResponse> => {
+    const res = await fetch(dailyChallengePath(), {
+      method: 'POST',
+      headers: jsonHeaders(),
+    });
+    const data = (await res.json().catch(() => ({}))) as DailyChallengeResponse & { error?: string };
+    if (!res.ok) {
+      throw new Error(data.error || 'Could not load a new challenge photo');
+    }
+    return data as DailyChallengeResponse;
+  },
+
   saveDailyChallengeJournal: async (body: string): Promise<DailyChallengeJournal> => {
     const res = await fetch(dailyChallengePath(), {
       method: 'PUT',

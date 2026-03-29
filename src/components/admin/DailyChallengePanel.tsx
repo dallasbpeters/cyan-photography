@@ -3,7 +3,7 @@ import type { DailyChallengeInfo, DailyChallengeJournal } from '../../types';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Sparkles, Bell, BellOff, ExternalLink } from 'lucide-react';
+import { Sparkles, Bell, BellOff, ExternalLink, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { portfolioService } from '../../services/portfolioService';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ export const DailyChallengePanel = () => {
   const [thoughts, setThoughts] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(() => {
     try {
       return localStorage.getItem(LS_NOTIFY) === '1';
@@ -81,6 +82,22 @@ export const DailyChallengePanel = () => {
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [challenge]);
+
+  const handleRefreshPhoto = async () => {
+    setRefreshing(true);
+    try {
+      const data = await portfolioService.refreshDailyChallenge();
+      setChallenge(data.challenge);
+      const j = data.journal;
+      setJournal(j);
+      setThoughts((prev) => (j ? j.body : prev));
+      toast.success('New inspiration loaded');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not refresh photo');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSaveJournal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,19 +158,33 @@ export const DailyChallengePanel = () => {
             Inspiration from Unsplash (UTC day). Your notes are private to your account.
           </p>
         </div>
-        {canUseNotifications() && (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void handleToggleNotify()}
+            disabled={loading || refreshing || !challenge}
+            onClick={() => void handleRefreshPhoto()}
             className="shrink-0 gap-2 border-white/20 text-[10px] uppercase tracking-widest text-white/80 hover:bg-white/10"
-            aria-pressed={notifyEnabled}
+            aria-label="Load a different inspiration photo"
           >
-            {notifyEnabled ? <BellOff size={14} aria-hidden /> : <Bell size={14} aria-hidden />}
-            {notifyEnabled ? 'Turn off alerts' : 'Notify me'}
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} aria-hidden />
+            {refreshing ? 'Loading…' : 'New photo'}
           </Button>
-        )}
+          {canUseNotifications() && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void handleToggleNotify()}
+              className="shrink-0 gap-2 border-white/20 text-[10px] uppercase tracking-widest text-white/80 hover:bg-white/10"
+              aria-pressed={notifyEnabled}
+            >
+              {notifyEnabled ? <BellOff size={14} aria-hidden /> : <Bell size={14} aria-hidden />}
+              {notifyEnabled ? 'Turn off alerts' : 'Notify me'}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-5 pt-6">
         {loading && (
