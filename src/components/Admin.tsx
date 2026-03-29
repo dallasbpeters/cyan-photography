@@ -351,7 +351,7 @@ export const Admin = () => {
           Admin Access
         </h2>
         <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] text-center max-w-sm px-2">
-          Sign in with your Neon-backed admin account (create one with the seed script or register API).
+          Sign in with your email and password.
         </p>
         <form
           onSubmit={handleLogin}
