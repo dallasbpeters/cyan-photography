@@ -1,5 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { bootstrapEnv } from './bootstrapEnv';
+
+bootstrapEnv();
 
 const BCRYPT_ROUNDS = 10;
 
@@ -34,5 +37,8 @@ export const getBearerUser = (
   const token = authHeader.slice(7);
   const decoded = verifyToken(token);
   if (!decoded) return null;
-  return { userId: decoded.sub, email: decoded.email };
+  const userId = decoded.sub != null ? String(decoded.sub) : '';
+  const email = decoded.email != null ? String(decoded.email) : '';
+  if (!userId || !email) return null;
+  return { userId, email };
 };

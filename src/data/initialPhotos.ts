@@ -1,7 +1,12 @@
-import type { Photo } from '../types';
+/** Seed rows — `category` is a slug that must exist in `categories` (e.g. film, photography). */
+export type SeedPhotoRow = {
+  url: string;
+  title: string;
+  category: string;
+  order: number;
+};
 
-/** Seed data for Neon — static timestamps for reproducible seeds */
-export const INITIAL_PHOTOS_SEED: Omit<Photo, 'id' | 'createdAt'>[] = [
+export const INITIAL_PHOTOS_SEED: SeedPhotoRow[] = [
   { url: 'https://picsum.photos/seed/sxi1/1920/1080', title: 'C&W x Torten Rituale', category: 'film', order: 1 },
   { url: 'https://picsum.photos/seed/sxi2/1920/1080', title: 'OACE x TONED', category: 'photography', order: 2 },
   { url: 'https://picsum.photos/seed/sxi3/1920/1080', title: 'Minor x Der Moment...', category: 'film', order: 3 },

@@ -1,18 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSql } from '../_lib/db';
 import { signToken, verifyPassword } from '../_lib/auth';
+import { handleCors } from '../_lib/cors';
+import { parseJsonBody } from '../_lib/parseBody';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const raw = req.body;
-    const body = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const password = typeof body?.password === 'string' ? body.password : '';
+    const body = parseJsonBody(req.body);
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -38,6 +41,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (e) {
     console.error(e);
+    const msg = e instanceof Error ? e.message : '';
+    if (msg.includes('JWT_SECRET')) {
+      return res.status(500).json({ error: 'JWT_SECRET is not configured.' });
+    }
+    if (msg.includes('DATABASE_URL')) {
+      return res.status(500).json({ error: 'DATABASE_URL is not configured.' });
+    }
     return res.status(500).json({ error: 'Login failed' });
   }
 }

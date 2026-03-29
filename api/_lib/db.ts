@@ -1,4 +1,7 @@
 import { neon } from '@neondatabase/serverless';
+import { bootstrapEnv } from './bootstrapEnv';
+
+bootstrapEnv();
 
 export const getSql = () => {
   const url = process.env.DATABASE_URL;

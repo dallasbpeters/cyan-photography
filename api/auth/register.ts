@@ -1,8 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSql } from '../_lib/db';
 import { hashPassword } from '../_lib/auth';
+import { handleCors } from '../_lib/cors';
+import { parseJsonBody } from '../_lib/parseBody';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (handleCors(req, res)) return;
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -16,11 +20,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const raw = req.body;
-    const body = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const password = typeof body?.password === 'string' ? body.password : '';
-    const secret = typeof body?.setupSecret === 'string' ? body.setupSecret : '';
+    const body = parseJsonBody(req.body);
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
+    const secret = typeof body.setupSecret === 'string' ? body.setupSecret : '';
 
     if (secret !== setupSecret) {
       return res.status(403).json({ error: 'Invalid setup secret' });

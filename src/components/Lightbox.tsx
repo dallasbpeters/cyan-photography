@@ -56,7 +56,7 @@ export function Lightbox({ photos, currentIndex, onClose, onNext, onPrev }: Ligh
         />
         <div className="mt-4 text-center">
           <h3 className="text-white text-lg font-light tracking-widest uppercase">{currentPhoto.title}</h3>
-          <p className="text-white/50 text-sm mt-1 uppercase tracking-tighter">{currentPhoto.category}</p>
+          <p className="text-white/50 text-sm mt-1 uppercase tracking-tighter">{currentPhoto.categoryLabel}</p>
         </div>
       </div>
     </motion.div>
