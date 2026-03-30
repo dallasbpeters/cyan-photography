@@ -12,7 +12,8 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Trash2, Plus, LogOut, LogIn, Shield, Pencil, FilePenLine, Tags, Upload } from 'lucide-react';
+import { Checkbox } from './ui/checkbox';
+import { Trash2, Plus, LogIn, Shield, Pencil, FilePenLine, Tags, Upload } from 'lucide-react';
 import { CategoryPicker } from './admin/CategoryPicker';
 import { CategoriesManageDialog } from './admin/CategoriesManageDialog';
 import { DailyChallengePanel } from './admin/DailyChallengePanel';
@@ -23,8 +24,13 @@ import { authApi, authStorage, portfolioService } from '../services/portfolioSer
 const sortCategories = (list: Category[]): Category[] =>
   [...list].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
 
-export const Admin = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(authStorage.getToken()));
+type AdminProps = {
+  isAuthenticated: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
+};
+
+export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loginEmail, setLoginEmail] = useState('');
@@ -154,23 +160,14 @@ export const Admin = () => {
     try {
       const { token } = await authApi.login(loginEmail, loginPassword);
       authStorage.setToken(token);
-      setIsAuthenticated(true);
       setLoginPassword('');
       toast.success('Signed in');
+      onLogin();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setIsSubmittingLogin(false);
     }
-  };
-
-  const handleLogout = () => {
-    authStorage.setToken(null);
-    setIsAuthenticated(false);
-    setPhotos([]);
-    setCategories([]);
-    setSelectedPhotoIds([]);
-    toast.message('Signed out');
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -406,9 +403,7 @@ export const Admin = () => {
   return (
     <div className="max-w-6xl mx-auto w-full space-y-8 md:space-y-12">
       <div className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:pb-8">
-        <h1 className="text-2xl sm:text-3xl font-light tracking-[0.25em] sm:tracking-[0.3em] uppercase">
-          Cyan Admin
-        </h1>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -418,15 +413,6 @@ export const Admin = () => {
           >
             <Tags size={16} aria-hidden />
             Categories
-          </Button>
-          <Button
-            onClick={handleLogout}
-            variant="ghost"
-            className="min-h-11 flex items-center gap-2 text-white/40 hover:text-white uppercase tracking-widest text-[10px]"
-            type="button"
-          >
-            <LogOut size={16} aria-hidden />
-            Sign out
           </Button>
         </div>
       </div>
@@ -443,7 +429,7 @@ export const Admin = () => {
 
       <DailyChallengePanel />
 
-      <Card className="bg-white/5 border-white/10">
+      <Card className="bg-white/5 border-white/10 overflow-visible">
         <CardHeader>
           <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">Add New Item</CardTitle>
         </CardHeader>
@@ -595,13 +581,12 @@ export const Admin = () => {
           ) : (
             <>
               <div className="flex items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-2.5 md:hidden">
-                <input
+                <Checkbox
                   ref={selectAllMobileRef}
-                  type="checkbox"
                   checked={allPhotosSelected}
                   onChange={handleToggleAllPhotos}
                   disabled={photos.length === 0}
-                  className="h-5 w-5 shrink-0 rounded border-white/30 bg-black/40 accent-white"
+                  className="h-5 w-5"
                   aria-label="Select all photos"
                 />
                 <span className="text-[10px] uppercase tracking-widest text-white/50">Select all</span>
@@ -629,11 +614,10 @@ export const Admin = () => {
                           aria-hidden
                         />
                         <label className="absolute left-1 top-1 z-10 flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selected}
                             onChange={() => handleTogglePhoto(photo.id)}
-                            className="h-5 w-5 rounded border-white/40 bg-black/60 accent-white"
+                            className="h-5 w-5"
                             aria-label={`Select ${photo.title}`}
                           />
                         </label>
@@ -690,13 +674,11 @@ export const Admin = () => {
                     <TableRow className="border-white/10 hover:bg-transparent">
                       <TableHead className="w-10 text-[10px] uppercase tracking-widest text-white/40">
                         <span className="sr-only">Select row</span>
-                        <input
+                        <Checkbox
                           ref={selectAllRef}
-                          type="checkbox"
                           checked={allPhotosSelected}
                           onChange={handleToggleAllPhotos}
                           disabled={photos.length === 0}
-                          className="h-4 w-4 rounded border-white/30 bg-black/40 accent-white"
                           aria-label="Select all photos"
                         />
                       </TableHead>
@@ -711,11 +693,9 @@ export const Admin = () => {
                     {photos.map((photo) => (
                       <TableRow key={photo.id} className="border-white/5 hover:bg-white/5 transition-colors">
                         <TableCell>
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selectedPhotoIds.includes(photo.id)}
                             onChange={() => handleTogglePhoto(photo.id)}
-                            className="h-4 w-4 rounded border-white/30 bg-black/40 accent-white"
                             aria-label={`Select ${photo.title}`}
                           />
                         </TableCell>

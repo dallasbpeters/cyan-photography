@@ -41,3 +41,8 @@ export type DailyChallengeResponse = {
   challenge: DailyChallengeInfo;
   journal: DailyChallengeJournal | null;
 };
+
+export type DailyChallengeHistoryEntry = {
+  challenge: DailyChallengeInfo;
+  journal: DailyChallengeJournal | null;
+};

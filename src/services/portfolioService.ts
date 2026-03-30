@@ -1,13 +1,11 @@
-import type { Category, DailyChallengeJournal, DailyChallengeResponse, Photo } from '../types';
+import type { Category, DailyChallengeHistoryEntry, DailyChallengeJournal, DailyChallengeResponse, Photo } from '../types';
 
 const apiBase = (): string => {
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_LOCAL_API === '1') {
-    return '';
-  }
+  // Dev: always same-origin. Vite proxies /api → vercel dev :3000.
+  // Port 3000 (vercel) hits its own handlers directly. Either port works.
+  if (import.meta.env.DEV) return '';
   const raw = import.meta.env.VITE_API_BASE_URL;
-  if (raw == null || String(raw).trim() === '') {
-    return '';
-  }
+  if (raw == null || String(raw).trim() === '') return '';
   return String(raw).replace(/\/$/, '');
 };
 
@@ -15,6 +13,7 @@ const photosPath = (): string => `${apiBase()}/api/photos`;
 const categoriesPath = (): string => `${apiBase()}/api/categories`;
 const uploadPath = (): string => `${apiBase()}/api/upload`;
 const dailyChallengePath = (): string => `${apiBase()}/api/daily-challenge`;
+const dailyChallengeHistoryPath = (): string => `${apiBase()}/api/daily-challenge/history`;
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -79,10 +78,10 @@ const jsonHeaders = (): HeadersInit => {
 };
 
 const devApiHintLocal =
-  'Run `pnpm dev:local` (starts API on :3000 + Vite on :5173), or two terminals: `pnpm dev:vercel` then `pnpm dev`. Comment out `VITE_API_BASE_URL` when using the local API.';
+  'Run `pnpm dev`, then open the URL Vercel prints (usually http://localhost:3000). `pnpm dev:vite` has no `/api`—do not use it for admin. Unset `VITE_API_BASE_URL` locally or rely on `VITE_USE_LOCAL_API=1` from the dev command.';
 
 const devApiHintRemote =
-  'You are calling a remote API via `VITE_API_BASE_URL`. If that fails, use `pnpm dev:local` instead (it ignores that var), or fix production CORS / deploy.';
+  'You are calling a remote API via `VITE_API_BASE_URL`. If that fails, run `pnpm dev` for full stack or fix deploy / CORS.';
 
 export const portfolioService = {
   getPhotos: async (): Promise<Photo[]> => {
@@ -260,6 +259,25 @@ export const portfolioService = {
     return data as DailyChallengeResponse;
   },
 
+  getDailyChallengeHistory: async (): Promise<DailyChallengeHistoryEntry[]> => {
+    const res = await fetch(dailyChallengeHistoryPath(), { headers: jsonHeaders() });
+    const data = (await res.json().catch(() => ({}))) as { entries?: DailyChallengeHistoryEntry[]; error?: string };
+    if (!res.ok) throw new Error(data.error || 'Could not load journal history');
+    return data.entries ?? [];
+  },
+
+  saveDailyChallengeJournalForDate: async (date: string, body: string): Promise<DailyChallengeJournal> => {
+    const res = await fetch(dailyChallengeHistoryPath(), {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ date, body }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { journal?: DailyChallengeJournal; error?: string };
+    if (!res.ok) throw new Error(data.error || 'Could not save journal');
+    if (!data.journal) throw new Error('Invalid response from server');
+    return data.journal;
+  },
+
   saveDailyChallengeJournal: async (body: string): Promise<DailyChallengeJournal> => {
     const res = await fetch(dailyChallengePath(), {
       method: 'PUT',
@@ -325,7 +343,7 @@ export const authApi = {
       });
     } catch {
       throw new Error(
-        `Could not reach ${url}. Use \`pnpm dev:local\` (API on :3000) or check your network / VITE_API_BASE_URL.`,
+        `Could not reach ${url}. Run \`pnpm dev\` and use the Vercel URL (e.g. http://localhost:3000), or check VITE_API_BASE_URL.`,
       );
     }
 
@@ -334,9 +352,21 @@ export const authApi = {
     try {
       data = JSON.parse(text) as { token?: string; error?: string };
     } catch {
-      throw new Error(
-        `Login failed (${res.status}): server did not return JSON. Is the API running?`,
-      );
+      const looksHtml =
+        /<!DOCTYPE/i.test(text) ||
+        /<html[\s>]/i.test(text) ||
+        (text.length > 0 && text.trimStart().startsWith('<'));
+      const base = apiBase();
+      const href =
+        typeof window !== 'undefined' && url.startsWith('/')
+          ? new URL(url, window.location.origin).href
+          : url;
+      const detail = looksHtml
+        ? base === ''
+          ? ' The body was HTML (typical when you opened the Vite port instead of Vercel, or the API is down). Run `pnpm dev` and use http://localhost:3000 (see CLI). For Vite-only + separate API, set `VITE_API_PROXY_TARGET`.'
+          : ' The body was HTML instead of JSON. Confirm `VITE_API_BASE_URL` points at a host that serves `POST /api/auth/login`.'
+        : ' Is the API running?';
+      throw new Error(`Login failed (${res.status}): not JSON from ${href}.${detail}`);
     }
 
     if (!res.ok) {

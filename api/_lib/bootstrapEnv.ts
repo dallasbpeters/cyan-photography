@@ -16,11 +16,14 @@ export const bootstrapEnv = (): void => {
   const vercelDev = process.env.VERCEL_DEV === '1';
   if (prod && !vercelDev) return;
 
+  // override: true so local .env files win over Vercel-injected vars during
+  // `vercel dev` — Vercel often injects a different DB URL than the one in
+  // .env.development.local, causing connections to the wrong host.
   const cwd = process.cwd();
   for (const name of ['.env', '.env.local', '.env.development.local']) {
     const path = resolve(cwd, name);
     if (existsSync(path)) {
-      config({ path });
+      config({ path, override: true });
     }
   }
 };

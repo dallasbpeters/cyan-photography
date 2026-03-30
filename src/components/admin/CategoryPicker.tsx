@@ -111,7 +111,7 @@ export const CategoryPicker = ({
   };
 
   return (
-    <div ref={containerRef} className={cn('relative space-y-2', className)}>
+    <div ref={containerRef} className={cn('relative gap-3 flex flex-col', className)}>
       <Label htmlFor={id} className="text-[10px] uppercase tracking-widest text-white/40">
         {label}
       </Label>
@@ -131,13 +131,13 @@ export const CategoryPicker = ({
         onKeyDown={handleKeyDown}
         autoComplete="off"
         placeholder="Search or add…"
-        className="border-white/10 bg-black/40 focus:border-white/40"
+        className="min-h-11 text-base sm:text-sm border-white/10 bg-black/40 focus:border-white/40"
       />
       {open && !disabled && (
         <div
           id={listboxId}
           role="listbox"
-          className="absolute top-full z-200 mt-1 max-h-48 w-full overflow-auto rounded-md border border-white/10 bg-neutral-950 py-1 shadow-xl ring-1 ring-black/40"
+          className="absolute top-full z-200 mt-1 max-h-48 min-w-60 w-full overflow-auto rounded-md border border-white/10 bg-neutral-950 py-1 shadow-xl ring-1 ring-black/40"
         >
           {filtered.length === 0 && !showAddNew && (
             <p className="px-3 py-2 text-xs text-white/40">No matches</p>

@@ -4,9 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=5173 --host=0.0.0.0",
-    "dev:local": "concurrently -k -n api,web -c cyan,magenta \"vercel dev --listen 3000\" \"wait-on tcp:127.0.0.1:3000 && cross-env VITE_USE_LOCAL_API=1 vite --port=5173 --host=0.0.0.0\"",
-    "dev:vercel": "vercel dev --listen 3000",
+    "dev": "node scripts/dev-stack.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
