@@ -33,22 +33,30 @@ export function PhotoEditor({ imageUrl, onClose }: PhotoEditorProps) {
         try {
           await initPhotoEditor(cesdk);
 
-          // Create a scene with the photo
+          // Resolve natural image dimensions before creating the scene
+          const { width: imgW, height: imgH } = await new Promise<{ width: number; height: number }>(
+            (resolve) => {
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+              img.onerror = () => resolve({ width: 1080, height: 1080 }); // fallback
+              img.src = imageUrl;
+            },
+          );
+
           await cesdk.actions.run('scene.create', {
-            page: { width: 1080, height: 1080, unit: 'Pixel' },
+            page: { width: imgW, height: imgH, unit: 'Pixel' },
           });
 
           const engine = cesdk.engine;
           const page = engine.block.findByType('page')[0];
 
           if (page != null) {
-            // Replace the page's default fill with an image fill
             const imageFill = engine.block.createFill('image');
             engine.block.setString(imageFill, 'fill/image/imageFileURI', imageUrl);
             engine.block.setFill(page, imageFill);
             engine.block.setContentFillMode(page, 'Cover');
 
-            // Zoom to fit
             await engine.scene.zoomToBlock(page, 40, 40, 40, 40);
           }
         } catch (error) {
@@ -69,7 +77,7 @@ export function PhotoEditor({ imageUrl, onClose }: PhotoEditorProps) {
   }, [imageUrl]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+    <div className="fixed inset-0 z-100 bg-black flex flex-col">
       <div className="flex items-center justify-between px-6 h-14 bg-black border-b border-white/10 shrink-0">
         <h2 className="text-sm font-light uppercase tracking-[0.3em] text-white/60">
           Photo Editor

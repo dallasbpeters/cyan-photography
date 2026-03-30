@@ -48,9 +48,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         LIMIT 365
       `) as HistoryRow[];
 
+      const toDateStr = (val: unknown): string => {
+        if (val instanceof Date) return val.toISOString().slice(0, 10);
+        const s = String(val);
+        return s.includes('T') ? s.slice(0, 10) : s.slice(0, 10);
+      };
+
       const entries = rows.map((r) => ({
         challenge: {
-          challengeDate: String(r.challenge_date).slice(0, 10),
+          challengeDate: toDateStr(r.challenge_date),
           imageUrl: r.image_url,
           imageThumbUrl: r.image_thumb_url,
           photographerName: r.photographer_name,
@@ -104,7 +110,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    res.setHeader('Allow', 'GET, PUT');
+    if (req.method === 'DELETE') {
+      const body = parseJsonBody(req.body);
+      const dateStr = typeof body.date === 'string' ? body.date.slice(0, 10) : null;
+      if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return res.status(400).json({ error: 'date is required (YYYY-MM-DD)' });
+      }
+
+      await sql`
+        DELETE FROM challenge_journal_entries
+        WHERE user_id = ${user.userId}::uuid AND challenge_date = ${dateStr}::date
+      `;
+
+      return res.status(200).json({ ok: true });
+    }
+
+    res.setHeader('Allow', 'GET, PUT, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (e) {
     console.error(e);

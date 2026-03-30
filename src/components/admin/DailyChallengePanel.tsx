@@ -3,7 +3,7 @@ import type { DailyChallengeHistoryEntry, DailyChallengeInfo, DailyChallengeJour
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Sparkles, Bell, BellOff, ExternalLink, RefreshCw, BookOpen, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Bell, BellOff, ExternalLink, RefreshCw, BookOpen, ChevronLeft, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { portfolioService } from '../../services/portfolioService';
 import { cn } from '@/lib/utils';
@@ -44,12 +44,14 @@ type HistoryEntryProps = {
   entry: DailyChallengeHistoryEntry;
   isToday: boolean;
   onSaved: (date: string, journal: DailyChallengeJournal) => void;
+  onDeleted: (date: string) => void;
 };
 
-const HistoryEntry = ({ entry, isToday, onSaved }: HistoryEntryProps) => {
+const HistoryEntry = ({ entry, isToday, onSaved, onDeleted }: HistoryEntryProps) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(entry.journal?.body ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -74,6 +76,21 @@ const HistoryEntry = ({ entry, isToday, onSaved }: HistoryEntryProps) => {
       toast.error(err instanceof Error ? err.message : 'Save failed');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this journal entry? This cannot be undone.')) return;
+    setDeleting(true);
+    try {
+      await portfolioService.deleteJournalEntry(entry.challenge.challengeDate);
+      setText('');
+      onDeleted(entry.challenge.challengeDate);
+      toast.success('Journal entry deleted');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -164,15 +181,31 @@ const HistoryEntry = ({ entry, isToday, onSaved }: HistoryEntryProps) => {
                     </span>
                   )}
                 </p>
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  variant="outline"
-                  size="sm"
-                  className="border-white/20 text-[10px] uppercase tracking-widest text-white/80 hover:bg-white/10"
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  {entry.journal && (
+                    <Button
+                      type="button"
+                      disabled={deleting}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleDelete()}
+                      className="gap-1.5 text-[10px] uppercase tracking-widest text-red-400/70 hover:bg-red-400/10 hover:text-red-400"
+                      aria-label="Delete journal entry"
+                    >
+                      <Trash2 size={12} aria-hidden />
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    variant="outline"
+                    size="sm"
+                    className="border-white/20 text-[10px] uppercase tracking-widest text-white/80 hover:bg-white/10"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
               </div>
             </form>
           </div>
@@ -332,10 +365,19 @@ export const DailyChallengePanel = () => {
     setHistory((prev) =>
       prev.map((h) => (h.challenge.challengeDate === date ? { ...h, journal: saved } : h)),
     );
-    // sync today if it matches
     if (challenge?.challengeDate === date) {
       setJournal(saved);
       setThoughts(saved.body);
+    }
+  };
+
+  const handleHistoryDeleted = (date: string) => {
+    setHistory((prev) =>
+      prev.map((h) => (h.challenge.challengeDate === date ? { ...h, journal: null } : h)),
+    );
+    if (challenge?.challengeDate === date) {
+      setJournal(null);
+      setThoughts('');
     }
   };
 
@@ -541,6 +583,7 @@ export const DailyChallengePanel = () => {
                     entry={entry}
                     isToday={entry.challenge.challengeDate === todayDate}
                     onSaved={handleHistorySaved}
+                    onDeleted={handleHistoryDeleted}
                   />
                 ))}
               </>

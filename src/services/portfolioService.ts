@@ -266,6 +266,16 @@ export const portfolioService = {
     return data.entries ?? [];
   },
 
+  deleteJournalEntry: async (date: string): Promise<void> => {
+    const res = await fetch(dailyChallengeHistoryPath(), {
+      method: 'DELETE',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ date }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) throw new Error(data.error || 'Could not delete journal entry');
+  },
+
   saveDailyChallengeJournalForDate: async (date: string, body: string): Promise<DailyChallengeJournal> => {
     const res = await fetch(dailyChallengeHistoryPath(), {
       method: 'PUT',
