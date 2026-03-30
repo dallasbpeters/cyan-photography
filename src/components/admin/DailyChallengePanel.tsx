@@ -372,9 +372,7 @@ export const DailyChallengePanel = () => {
   };
 
   const handleHistoryDeleted = (date: string) => {
-    setHistory((prev) =>
-      prev.map((h) => (h.challenge.challengeDate === date ? { ...h, journal: null } : h)),
-    );
+    setHistory((prev) => prev.filter((h) => h.challenge.challengeDate !== date));
     if (challenge?.challengeDate === date) {
       setJournal(null);
       setThoughts('');
