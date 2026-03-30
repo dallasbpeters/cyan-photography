@@ -70,7 +70,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const title = typeof body.title === 'string' ? sanitizeText(body.title) : '';
       const categoryId =
         typeof body.categoryId === 'string' ? sanitizeText(body.categoryId) : '';
-      const order = typeof body.order === 'number' ? body.order : Number(body.order);
 
       if (!url) {
         return res.status(400).json({
@@ -80,20 +79,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!title || !categoryId) {
         return res.status(400).json({ error: 'Invalid url, title, or categoryId' });
       }
-      if (!Number.isFinite(order)) {
-        return res.status(400).json({ error: 'Invalid order' });
-      }
 
       const catOk = await sql`SELECT id FROM categories WHERE id = ${categoryId} LIMIT 1`;
       if (catOk.length === 0) {
         return res.status(400).json({ error: 'Unknown category' });
       }
 
+      // Shift all existing photos up so the new one lands at position 0
+      await sql`UPDATE photos SET sort_order = sort_order + 1`;
+
       const inserted = (await sql.query(
         `INSERT INTO photos (url, title, category_id, sort_order, created_by)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [url, title, categoryId, order, user.userId],
+        [url, title, categoryId, 0, user.userId],
       )) as { id: string }[];
 
       const newId = inserted[0]?.id;

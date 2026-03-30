@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Checkbox } from './ui/checkbox';
 import { Trash2, Plus, LogIn, Shield, Pencil, FilePenLine, Tags, Upload } from 'lucide-react';
 import { CategoryPicker } from './admin/CategoryPicker';
@@ -47,7 +46,6 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
   const [newPhoto, setNewPhoto] = useState({
     title: '',
     categoryId: '',
-    order: 0,
   });
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
@@ -57,8 +55,9 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [uploadDraftFile, setUploadDraftFile] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [newlyAddedPhotoId, setNewlyAddedPhotoId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
-  const selectAllMobileRef = useRef<HTMLInputElement>(null);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadPhotos = useCallback(async () => {
@@ -148,10 +147,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
 
   useEffect(() => {
     const indeterminate = somePhotosSelected && !allPhotosSelected;
-    const desktop = selectAllRef.current;
-    const mobile = selectAllMobileRef.current;
-    if (desktop) desktop.indeterminate = indeterminate;
-    if (mobile) mobile.indeterminate = indeterminate;
+    if (selectAllRef.current) selectAllRef.current.indeterminate = indeterminate;
   }, [somePhotosSelected, allPhotosSelected]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -192,7 +188,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
       setIsUploadingImage(false);
     }
     try {
-      await portfolioService.addPhoto({ ...newPhoto, url });
+      const added = await portfolioService.addPhoto({ ...newPhoto, url });
       await loadPhotos();
       await loadCategories();
       portfolioService.notifyPhotosChanged();
@@ -202,8 +198,10 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
       setNewPhoto((prev) => ({
         title: '',
         categoryId: prev.categoryId,
-        order: photos.length + 1,
       }));
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      setNewlyAddedPhotoId(added.id);
+      highlightTimerRef.current = setTimeout(() => setNewlyAddedPhotoId(null), 3000);
       toast.success('Photo added successfully');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error adding photo');
@@ -436,7 +434,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
         <CardContent>
           <form
             onSubmit={handleAdd}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 md:gap-6 items-end"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 md:gap-6 items-end"
           >
             <div className="space-y-3 lg:col-span-2">
               <Label htmlFor="add-image-file" className="text-[10px] uppercase tracking-widest text-white/40">
@@ -466,7 +464,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
                 )}
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 lg:col-span-2">
               <Label htmlFor="title" className="text-[10px] uppercase tracking-widest text-white/40">Title</Label>
               <Input
                 id="title"
@@ -486,23 +484,11 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               onCreate={createCategoryFromLabel}
               disabled={categoryOptionsDisabled}
               isCreating={isSavingCategory}
-              className="min-w-0 lg:col-span-1"
             />
-            <div className="space-y-3">
-              <Label htmlFor="order" className="text-[10px] uppercase tracking-widest text-white/40">Order</Label>
-              <Input
-                id="order"
-                type="number"
-                value={newPhoto.order}
-                onChange={(e) => setNewPhoto({ ...newPhoto, order: parseInt(e.target.value, 10) })}
-                required
-                className="min-h-11 text-base sm:text-sm bg-black/40 border-white/10 focus:border-white/40 transition-colors"
-              />
-            </div>
             <Button
               type="submit"
               disabled={categoryOptionsDisabled || isUploadingImage || !uploadDraftFile}
-              className="w-full min-h-11 flex items-center justify-center gap-2 bg-white text-black hover:bg-white/80 transition-colors uppercase tracking-widest text-[10px] md:w-auto lg:col-span-1"
+              className="w-full min-h-11 flex items-center justify-center gap-2 bg-white text-black hover:bg-white/80 transition-colors uppercase tracking-widest text-[10px] md:col-span-2 lg:col-span-5"
             >
               <Plus size={16} aria-hidden />
               {isUploadingImage ? 'Uploading…' : 'Add Item'}
@@ -580,9 +566,9 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
             </p>
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-2.5 md:hidden">
+              <div className="flex items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-2.5">
                 <Checkbox
-                  ref={selectAllMobileRef}
+                  ref={selectAllRef}
                   checked={allPhotosSelected}
                   onChange={handleToggleAllPhotos}
                   disabled={photos.length === 0}
@@ -592,16 +578,17 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
                 <span className="text-[10px] uppercase tracking-widest text-white/50">Select all</span>
               </div>
 
-              <div className="p-2 sm:p-3 md:hidden">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 sm:p-3">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {photos.map((photo) => {
                     const selected = selectedPhotoIds.includes(photo.id);
+                    const isNew = photo.id === newlyAddedPhotoId;
                     return (
                       <article
                         key={photo.id}
                         className={`relative aspect-3/4 overflow-hidden rounded-lg border bg-black/40 transition-colors ${
                           selected ? 'border-white/40 ring-1 ring-white/30' : 'border-white/10'
-                        }`}
+                        } ${isNew ? 'animate-photo-enter' : ''}`}
                       >
                         <img
                           src={photo.url}
@@ -668,87 +655,6 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
                 </div>
               </div>
 
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader className="bg-white/5">
-                    <TableRow className="border-white/10 hover:bg-transparent">
-                      <TableHead className="w-10 text-[10px] uppercase tracking-widest text-white/40">
-                        <span className="sr-only">Select row</span>
-                        <Checkbox
-                          ref={selectAllRef}
-                          checked={allPhotosSelected}
-                          onChange={handleToggleAllPhotos}
-                          disabled={photos.length === 0}
-                          aria-label="Select all photos"
-                        />
-                      </TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-widest text-white/40">Preview</TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-widest text-white/40">Title</TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-widest text-white/40">Category</TableHead>
-                      <TableHead className="text-[10px] uppercase tracking-widest text-white/40">Order</TableHead>
-                      <TableHead className="text-right text-[10px] uppercase tracking-widest text-white/40">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {photos.map((photo) => (
-                      <TableRow key={photo.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedPhotoIds.includes(photo.id)}
-                            onChange={() => handleTogglePhoto(photo.id)}
-                            aria-label={`Select ${photo.title}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="w-16 h-10 overflow-hidden rounded bg-black/40">
-                            <img
-                              src={photo.url}
-                              alt=""
-                              className="w-full h-full object-cover opacity-80"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-light tracking-wide uppercase text-sm">{photo.title}</TableCell>
-                        <TableCell className="text-xs text-white/50">{photo.categoryLabel}</TableCell>
-                        <TableCell className="font-mono text-xs text-white/40">{photo.order}</TableCell>
-                        <TableCell className="text-right space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => handleOpenDetails(photo)}
-                            className="text-white/20 hover:text-white transition-colors"
-                            aria-label={`Edit title and category for ${photo.title}`}
-                          >
-                            <FilePenLine size={16} aria-hidden />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => setEditingPhotoUrl(photo.url)}
-                            className="text-white/20 hover:text-white transition-colors"
-                            aria-label={`Open image editor for ${photo.title}`}
-                          >
-                            <Pencil size={16} aria-hidden />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => void handleDelete(photo.id)}
-                            className="text-white/20 hover:text-red-500 transition-colors"
-                            aria-label={`Delete ${photo.title}`}
-                          >
-                            <Trash2 size={16} aria-hidden />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
             </>
           )}
         </CardContent>

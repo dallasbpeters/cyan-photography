@@ -204,7 +204,6 @@ export const portfolioService = {
     url: string;
     title: string;
     categoryId: string;
-    order: number;
   }): Promise<Photo> => {
     const res = await fetch(photosPath(), {
       method: 'POST',
@@ -213,7 +212,6 @@ export const portfolioService = {
         url: photo.url,
         title: photo.title,
         categoryId: photo.categoryId,
-        order: photo.order,
       }),
     });
     const data = (await res.json().catch(() => ({}))) as Photo & { error?: string; debug?: string };
