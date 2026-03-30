@@ -400,21 +400,6 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
 
   return (
     <div className="max-w-6xl mx-auto w-full space-y-8 md:space-y-12">
-      <div className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:pb-8">
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setCategoriesModalOpen(true)}
-            className="min-h-11 flex items-center gap-2 border-white/20 uppercase tracking-widest text-[10px] text-white/80 hover:bg-white/10 hover:text-white"
-          >
-            <Tags size={16} aria-hidden />
-            Categories
-          </Button>
-        </div>
-      </div>
-
       <CategoriesManageDialog
         open={categoriesModalOpen}
         onOpenChange={setCategoriesModalOpen}
@@ -499,7 +484,19 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
 
       <Card className="bg-white/5 border-white/10 overflow-hidden">
         <CardHeader className="flex flex-col gap-4 border-b border-white/5 sm:flex-row sm:items-start sm:justify-between">
-          <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">Current Items</CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">Current Items</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCategoriesModalOpen(true)}
+              className="flex items-center gap-1.5 border-white/15 uppercase tracking-widest text-[10px] text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              <Tags size={13} aria-hidden />
+              Categories
+            </Button>
+          </div>
           {somePhotosSelected && (
             <div
               className="flex w-full flex-col gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3 sm:px-4"
