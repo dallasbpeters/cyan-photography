@@ -21,7 +21,7 @@ export function AdminPage() {
     <div className="min-h-screen bg-black text-white font-sans">
       <Toaster position="top-center" theme="dark" />
       <nav className="fixed top-0 left-0 w-full z-50 border-b border-white/10 bg-black/80 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-16 sm:min-h-20 flex items-center justify-between gap-4 py-3 sm:py-0">
+        <div className="mx-auto px-4 sm:px-6 min-h-16 sm:min-h-20 flex items-center justify-between gap-4 py-3 sm:py-0">
           <h1 className="text-lg sm:text-xl font-light tracking-[0.25em] sm:tracking-[0.3em] uppercase truncate">
             Cyan Admin
           </h1>
@@ -46,7 +46,7 @@ export function AdminPage() {
           </div>
         </div>
       </nav>
-      <main className="mx-auto w-full max-w-7xl px-4 pb-[max(4rem,env(safe-area-inset-bottom,0px))] pt-24 sm:px-6 sm:pb-20 sm:pt-32">
+      <main className="mx-auto w-full px-4 pb-[max(4rem,env(safe-area-inset-bottom,0px))] pt-24 sm:px-6 sm:pb-20 sm:pt-32">
         <Admin isAuthenticated={isAuthenticated} onLogin={handleLogin} onLogout={handleLogout} />
       </main>
     </div>

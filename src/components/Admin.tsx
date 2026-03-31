@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { Category, Photo } from '../types';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -12,16 +11,17 @@ import {
   DialogTitle,
 } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
-import { Trash2, Plus, LogIn, Shield, Pencil, FilePenLine, Tags, Upload } from 'lucide-react';
+import { Trash2, Plus, LogIn, Shield, Pencil, FilePenLine, Tags, Upload, Layers, LayoutGrid } from 'lucide-react';
 import { CategoryPicker } from './admin/CategoryPicker';
 import { CategoriesManageDialog } from './admin/CategoriesManageDialog';
 import { DailyChallengePanel } from './admin/DailyChallengePanel';
 import { PhotoEditor } from './PhotoEditor';
-import { toast } from 'sonner';
-import { authApi, authStorage, portfolioService } from '../services/portfolioService';
-
-const sortCategories = (list: Category[]): Category[] =>
-  [...list].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+import { useAdminData } from '../hooks/useAdminData';
+import { useAdminLogin } from '../hooks/useAdminLogin';
+import { useAdminView } from '../hooks/useAdminView';
+import { useNewPhoto } from '../hooks/useNewPhoto';
+import { usePhotoDetails } from '../hooks/usePhotoDetails';
+import { usePhotoSelection } from '../hooks/usePhotoSelection';
 
 type AdminProps = {
   isAuthenticated: boolean;
@@ -29,313 +29,20 @@ type AdminProps = {
   onLogout: () => void;
 };
 
-export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
-  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
-  const [detailsPhoto, setDetailsPhoto] = useState<Photo | null>(null);
-  const [detailsTitle, setDetailsTitle] = useState('');
-  const [detailsCategoryId, setDetailsCategoryId] = useState('');
-  const [detailsOrder, setDetailsOrder] = useState(0);
-  const [isSavingDetails, setIsSavingDetails] = useState(false);
-  const [newPhoto, setNewPhoto] = useState({
-    title: '',
-    categoryId: '',
-  });
-  const [isSavingCategory, setIsSavingCategory] = useState(false);
+export const Admin = ({ isAuthenticated, onLogin }: AdminProps) => {
   const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
-  const [batchCategoryId, setBatchCategoryId] = useState('');
-  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  const [uploadDraftFile, setUploadDraftFile] = useState<File | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [newlyAddedPhotoId, setNewlyAddedPhotoId] = useState<string | null>(null);
-  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const selectAllRef = useRef<HTMLInputElement>(null);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
 
-  const loadPhotos = useCallback(async () => {
-    if (!authStorage.getToken()) return;
-    setIsLoadingPhotos(true);
-    try {
-      const list = await portfolioService.getPhotos();
-      setPhotos(list);
-    } catch {
-      toast.error('Could not load photos');
-      setPhotos([]);
-    } finally {
-      setIsLoadingPhotos(false);
-    }
-  }, []);
+  const login      = useAdminLogin(onLogin);
+  const data       = useAdminData(isAuthenticated);
+  const view       = useAdminView(data.photos);
+  const selection  = usePhotoSelection(data.photos, data.categories, data.reload);
+  const details    = usePhotoDetails(data.reload);
+  const newPhoto   = useNewPhoto(data.categories, data.reload);
 
-  const loadCategories = useCallback(async () => {
-    if (!authStorage.getToken()) return;
-    setIsLoadingCategories(true);
-    try {
-      const list = await portfolioService.getCategories();
-      setCategories(sortCategories(list));
-    } catch {
-      toast.error('Could not load categories');
-      setCategories([]);
-    } finally {
-      setIsLoadingCategories(false);
-    }
-  }, []);
+  const categoryOptionsDisabled = data.categories.length === 0;
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    void loadPhotos();
-    void loadCategories();
-  }, [isAuthenticated, loadPhotos, loadCategories]);
-
-  useEffect(() => {
-    const onPhotos = () => void loadPhotos();
-    const onCats = () => void loadCategories();
-    window.addEventListener('cyan-photos-changed', onPhotos);
-    window.addEventListener('cyan-categories-changed', onCats);
-    return () => {
-      window.removeEventListener('cyan-photos-changed', onPhotos);
-      window.removeEventListener('cyan-categories-changed', onCats);
-    };
-  }, [loadPhotos, loadCategories]);
-
-  useEffect(() => {
-    if (categories.length === 0) return;
-    setNewPhoto((prev) => {
-      if (prev.categoryId && categories.some((c) => c.id === prev.categoryId)) return prev;
-      return { ...prev, categoryId: categories[0].id };
-    });
-    setBatchCategoryId((prev) => {
-      if (prev && categories.some((c) => c.id === prev)) return prev;
-      return categories[0].id;
-    });
-  }, [categories]);
-
-  const createCategoryFromLabel = useCallback(
-    async (label: string): Promise<string | null> => {
-      const trimmed = label.trim();
-      if (!trimmed) return null;
-      const maxOrder = Math.max(...categories.map((c) => c.sortOrder), -1);
-      setIsSavingCategory(true);
-      try {
-        const cat = await portfolioService.createCategory({
-          label: trimmed,
-          sortOrder: maxOrder + 1,
-        });
-        await loadCategories();
-        portfolioService.notifyCategoriesChanged();
-        toast.success(`Added “${cat.label}”`);
-        return cat.id;
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not create category');
-        return null;
-      } finally {
-        setIsSavingCategory(false);
-      }
-    },
-    [categories, loadCategories],
-  );
-
-  const allPhotosSelected = photos.length > 0 && photos.every((p) => selectedPhotoIds.includes(p.id));
-  const somePhotosSelected = selectedPhotoIds.length > 0;
-
-  useEffect(() => {
-    const indeterminate = somePhotosSelected && !allPhotosSelected;
-    if (selectAllRef.current) selectAllRef.current.indeterminate = indeterminate;
-  }, [somePhotosSelected, allPhotosSelected]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingLogin(true);
-    try {
-      const { token } = await authApi.login(loginEmail, loginPassword);
-      authStorage.setToken(token);
-      setLoginPassword('');
-      toast.success('Signed in');
-      onLogin();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Login failed');
-    } finally {
-      setIsSubmittingLogin(false);
-    }
-  };
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPhoto.categoryId) {
-      toast.error('Choose a category');
-      return;
-    }
-    if (!uploadDraftFile) {
-      toast.error('Choose an image file to upload');
-      return;
-    }
-    setIsUploadingImage(true);
-    let url: string;
-    try {
-      const { url: uploaded } = await portfolioService.uploadImageFile(uploadDraftFile);
-      url = uploaded;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Upload failed');
-      return;
-    } finally {
-      setIsUploadingImage(false);
-    }
-    try {
-      const added = await portfolioService.addPhoto({ ...newPhoto, url });
-      await loadPhotos();
-      await loadCategories();
-      portfolioService.notifyPhotosChanged();
-      portfolioService.notifyCategoriesChanged();
-      setUploadDraftFile(null);
-      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
-      setNewPhoto((prev) => ({
-        title: '',
-        categoryId: prev.categoryId,
-      }));
-      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-      setNewlyAddedPhotoId(added.id);
-      highlightTimerRef.current = setTimeout(() => setNewlyAddedPhotoId(null), 3000);
-      toast.success('Photo added successfully');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error adding photo');
-    }
-  };
-
-  const handleDeleteCategory = async (cat: Category) => {
-    if (!confirm(`Delete category “${cat.label}”?`)) return;
-    try {
-      await portfolioService.deleteCategory(cat.id);
-      await loadCategories();
-      portfolioService.notifyCategoriesChanged();
-      toast.success('Category deleted');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not delete category');
-    }
-  };
-
-  const handleTogglePhoto = (id: string) => {
-    setSelectedPhotoIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
-  const handleToggleAllPhotos = () => {
-    if (allPhotosSelected) {
-      setSelectedPhotoIds([]);
-      return;
-    }
-    setSelectedPhotoIds(photos.map((p) => p.id));
-  };
-
-  const handleClearSelection = () => {
-    setSelectedPhotoIds([]);
-  };
-
-  const handleBatchSetCategory = async () => {
-    if (selectedPhotoIds.length === 0 || !batchCategoryId) return;
-    setIsBatchUpdating(true);
-    try {
-      const updated = await portfolioService.batchSetPhotoCategories(selectedPhotoIds, batchCategoryId);
-      await loadPhotos();
-      await loadCategories();
-      portfolioService.notifyPhotosChanged();
-      portfolioService.notifyCategoriesChanged();
-      setSelectedPhotoIds([]);
-      if (updated === 0) {
-        toast.error('No photos were updated — check selections and try again.');
-        return;
-      }
-      toast.success(`Updated ${updated} photo(s)`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Batch update failed');
-    } finally {
-      setIsBatchUpdating(false);
-    }
-  };
-
-  const handleBatchDelete = async () => {
-    if (selectedPhotoIds.length === 0) return;
-    const n = selectedPhotoIds.length;
-    if (!confirm(`Delete ${n} photo${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
-    setIsBatchDeleting(true);
-    try {
-      const deleted = await portfolioService.batchDeletePhotos(selectedPhotoIds);
-      await loadPhotos();
-      await loadCategories();
-      portfolioService.notifyPhotosChanged();
-      portfolioService.notifyCategoriesChanged();
-      setSelectedPhotoIds([]);
-      if (deleted === 0) {
-        toast.error('No photos were deleted.');
-        return;
-      }
-      toast.success(`Deleted ${deleted} photo${deleted === 1 ? '' : 's'}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Batch delete failed');
-    } finally {
-      setIsBatchDeleting(false);
-    }
-  };
-
-  const handleOpenDetails = (photo: Photo) => {
-    setDetailsPhoto(photo);
-    setDetailsTitle(photo.title);
-    setDetailsCategoryId(photo.categoryId);
-    setDetailsOrder(photo.order);
-  };
-
-  const handleCloseDetails = () => {
-    setDetailsPhoto(null);
-  };
-
-  const handleSaveDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!detailsPhoto) return;
-    if (!detailsCategoryId) {
-      toast.error('Choose a category');
-      return;
-    }
-    setIsSavingDetails(true);
-    try {
-      await portfolioService.updatePhoto(detailsPhoto.id, {
-        title: detailsTitle.trim(),
-        categoryId: detailsCategoryId,
-        order: detailsOrder,
-      });
-      await loadPhotos();
-      await loadCategories();
-      portfolioService.notifyPhotosChanged();
-      portfolioService.notifyCategoriesChanged();
-      toast.success('Details saved');
-      handleCloseDetails();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Could not save details');
-    } finally {
-      setIsSavingDetails(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure?')) return;
-    try {
-      await portfolioService.deletePhoto(id);
-      await loadPhotos();
-      await loadCategories();
-      portfolioService.notifyPhotosChanged();
-      portfolioService.notifyCategoriesChanged();
-      setSelectedPhotoIds((prev) => prev.filter((x) => x !== id));
-      toast.success('Photo deleted');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Error deleting photo');
-    }
-  };
+  // ── Login screen ────────────────────────────────────────────────────────────
 
   if (!isAuthenticated) {
     return (
@@ -350,7 +57,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
           Sign in with your email and password.
         </p>
         <form
-          onSubmit={handleLogin}
+          onSubmit={(e) => void login.handleLogin(e)}
           className="w-full max-w-sm space-y-4"
           aria-label="Admin sign in"
         >
@@ -362,8 +69,8 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               id="admin-email"
               type="email"
               autoComplete="username"
-              value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
+              value={login.email}
+              onChange={(e) => login.setEmail(e.target.value)}
               required
               className="min-h-11 text-base bg-black/40 border-white/10 focus:border-white/40 transition-colors"
             />
@@ -376,116 +83,126 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               id="admin-password"
               type="password"
               autoComplete="current-password"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
+              value={login.password}
+              onChange={(e) => login.setPassword(e.target.value)}
               required
               className="min-h-11 text-base bg-black/40 border-white/10 focus:border-white/40 transition-colors"
             />
           </div>
           <Button
             type="submit"
-            disabled={isSubmittingLogin}
+            disabled={login.isSubmitting}
             variant="outline"
             className="w-full min-h-12 flex items-center justify-center gap-2 border-white/20 hover:bg-white hover:text-black transition-all duration-500 uppercase tracking-widest text-[10px] px-8 py-3"
           >
             <LogIn size={16} aria-hidden />
-            {isSubmittingLogin ? 'Signing in…' : 'Sign in'}
+            {login.isSubmitting ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
       </div>
     );
   }
 
-  const categoryOptionsDisabled = categories.length === 0;
+  // ── Authenticated ────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-6xl mx-auto w-full space-y-8 md:space-y-12">
+    <div className="mx-auto w-full space-y-8 md:space-y-12">
       <CategoriesManageDialog
         open={categoriesModalOpen}
         onOpenChange={setCategoriesModalOpen}
-        categories={categories}
-        loading={isLoadingCategories}
-        isCreating={isSavingCategory}
-        onCreate={createCategoryFromLabel}
-        onDelete={(cat) => void handleDeleteCategory(cat)}
+        categories={data.categories}
+        loading={data.isLoadingCategories}
+        isCreating={data.isSavingCategory}
+        onCreate={data.createCategoryFromLabel}
+        onDelete={(cat) => void data.handleDeleteCategory(cat)}
       />
 
-      <DailyChallengePanel />
+      {/* ── Top row: daily challenge + add form ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-5 md:gap-6 items-end">
+        <DailyChallengePanel />
 
-      <Card className="bg-white/5 border-white/10 overflow-visible">
-        <CardHeader>
-          <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">Add New Item</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            onSubmit={handleAdd}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 md:gap-6 items-end"
-          >
-            <div className="space-y-3 lg:col-span-2">
-              <Label htmlFor="add-image-file" className="text-[10px] uppercase tracking-widest text-white/40">
-                Image
-              </Label>
-              <div className="flex flex-col gap-2">
-                <input
-                  ref={imageFileInputRef}
-                  id="add-image-file"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  required
-                  className="min-h-11 w-full text-[11px] text-white/70 file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-2.5 file:text-[10px] file:font-medium file:uppercase file:tracking-widest file:text-white/90 hover:file:bg-white/15"
-                  aria-label="Upload image from device"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setUploadDraftFile(f);
-                  }}
-                />
-                {uploadDraftFile ? (
-                  <p className="flex items-center gap-1 text-[10px] text-white/45">
-                    <Upload size={12} className="shrink-0 opacity-70" aria-hidden />
-                    <span className="truncate">{uploadDraftFile.name}</span>
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-white/35">JPEG, PNG, WebP, or GIF (max 8MB).</p>
-                )}
-              </div>
-            </div>
-            <div className="space-y-3 lg:col-span-2">
-              <Label htmlFor="title" className="text-[10px] uppercase tracking-widest text-white/40">Title</Label>
-              <Input
-                id="title"
-                value={newPhoto.title}
-                onChange={(e) => setNewPhoto({ ...newPhoto, title: e.target.value })}
-                placeholder="Project Name"
-                required
-                className="min-h-11 text-base sm:text-sm bg-black/40 border-white/10 focus:border-white/40 transition-colors"
-              />
-            </div>
-            <CategoryPicker
-              id="add-item-category"
-              label="Category"
-              categories={categories}
-              value={newPhoto.categoryId}
-              onChange={(categoryId) => setNewPhoto({ ...newPhoto, categoryId })}
-              onCreate={createCategoryFromLabel}
-              disabled={categoryOptionsDisabled}
-              isCreating={isSavingCategory}
-            />
-            <Button
-              type="submit"
-              disabled={categoryOptionsDisabled || isUploadingImage || !uploadDraftFile}
-              className="w-full min-h-11 flex items-center justify-center gap-2 bg-white text-black hover:bg-white/80 transition-colors uppercase tracking-widest text-[10px] md:col-span-2 lg:col-span-5"
+        <Card className="bg-white/5 border-white/10 overflow-visible h-full">
+          <CardHeader>
+            <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">
+              Add New Item
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={(e) => void newPhoto.handleAdd(e)}
+              className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 items-end"
             >
-              <Plus size={16} aria-hidden />
-              {isUploadingImage ? 'Uploading…' : 'Add Item'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="space-y-3 lg:col-span-2">
+                <Label htmlFor="add-image-file" className="text-[10px] uppercase tracking-widest text-white/40">
+                  Image
+                </Label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={newPhoto.imageFileInputRef}
+                    id="add-image-file"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    required
+                    className="min-h-11 w-full text-[11px] text-white/70 file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-2.5 file:text-[10px] file:font-medium file:uppercase file:tracking-widest file:text-white/90 hover:file:bg-white/15"
+                    aria-label="Upload image from device"
+                    onChange={(e) => newPhoto.setUploadDraftFile(e.target.files?.[0] ?? null)}
+                  />
+                  {newPhoto.uploadDraftFile ? (
+                    <p className="flex items-center gap-1 text-[10px] text-white/45">
+                      <Upload size={12} className="shrink-0 opacity-70" aria-hidden />
+                      <span className="truncate">{newPhoto.uploadDraftFile.name}</span>
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-white/35">JPEG, PNG, WebP, or GIF (max 8MB).</p>
+                  )}
+                </div>
+              </div>
 
+              <div className="space-y-3 lg:col-span-2">
+                <Label htmlFor="title" className="text-[10px] uppercase tracking-widest text-white/40">
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  value={newPhoto.form.title}
+                  onChange={(e) => newPhoto.setForm({ ...newPhoto.form, title: e.target.value })}
+                  placeholder="Project Name"
+                  required
+                  className="min-h-11 text-base sm:text-sm bg-black/40 border-white/10 focus:border-white/40 transition-colors"
+                />
+              </div>
+
+              <CategoryPicker
+                id="add-item-category"
+                label="Category"
+                categories={data.categories}
+                value={newPhoto.form.categoryId}
+                onChange={(categoryId) => newPhoto.setForm({ ...newPhoto.form, categoryId })}
+                onCreate={data.createCategoryFromLabel}
+                disabled={categoryOptionsDisabled}
+                isCreating={data.isSavingCategory}
+              />
+
+              <Button
+                type="submit"
+                disabled={categoryOptionsDisabled || newPhoto.isUploading || !newPhoto.uploadDraftFile}
+                className="w-full min-h-11 flex items-center justify-center gap-2 bg-[#52ffd4] text-black hover:bg-white/80 transition-colors uppercase tracking-widest text-[12px] lg:col-span-1"
+              >
+                <Plus size={16} aria-hidden />
+                {newPhoto.isUploading ? 'Uploading…' : 'Add Item'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Current items ── */}
       <Card className="bg-white/5 border-white/10 overflow-hidden">
-        <CardHeader className="flex flex-col gap-4 border-b border-white/5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-center gap-3">
-            <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60">Current Items</CardTitle>
+        <CardHeader className="flex flex-col gap-3 border-b border-white/5 md:flex-row md:items-center md:gap-4">
+          <div className="flex shrink-0 items-center gap-3">
+            <CardTitle className="text-sm font-light uppercase tracking-[0.3em] text-white/60 whitespace-nowrap">
+              Current Items
+            </CardTitle>
             <Button
               type="button"
               variant="outline"
@@ -496,56 +213,70 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               <Tags size={13} aria-hidden />
               Categories
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={view.toggleView}
+              aria-label={view.stackedView ? 'Switch to grid view' : 'Switch to stacked view'}
+              className={`flex items-center gap-1.5 border-white/15 uppercase tracking-widest text-[10px] hover:bg-white/10 hover:text-white transition-colors ${
+                view.stackedView ? 'bg-white/10 text-white border-white/30' : 'text-white/60'
+              }`}
+            >
+              {view.stackedView ? <LayoutGrid size={13} aria-hidden /> : <Layers size={13} aria-hidden />}
+              {view.stackedView ? 'Grid' : 'Stack'}
+            </Button>
           </div>
-          {somePhotosSelected && (
+
+          {selection.someSelected && (
             <div
-              className="flex w-full flex-col gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3 sm:px-4"
+              className="flex w-full flex-col gap-2 md:ml-auto md:w-auto md:flex-row md:items-center"
               role="region"
               aria-label="Batch actions for selected photos"
             >
               <span className="shrink-0 text-[10px] uppercase tracking-widest text-white/50">
-                {selectedPhotoIds.length} selected
+                {selection.selectedIds.length} selected
               </span>
-              <div className="w-full min-w-0 sm:min-w-48 sm:flex-1 sm:max-w-xs">
+              <div className="w-full min-w-0 md:max-w-48 md:flex-1">
                 <CategoryPicker
                   id="batch-category"
                   label="Category"
-                  categories={categories}
-                  value={batchCategoryId}
-                  onChange={setBatchCategoryId}
-                  onCreate={createCategoryFromLabel}
+                  categories={data.categories}
+                  value={selection.batchCategoryId}
+                  onChange={selection.setBatchCategoryId}
+                  onCreate={data.createCategoryFromLabel}
                   disabled={categoryOptionsDisabled}
-                  isCreating={isSavingCategory}
+                  isCreating={data.isSavingCategory}
                   className="[&_label]:sr-only"
                 />
               </div>
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   size="sm"
-                  disabled={isBatchUpdating || isBatchDeleting || categoryOptionsDisabled}
-                  onClick={() => void handleBatchSetCategory()}
-                  className="col-span-2 min-h-11 bg-white text-black hover:bg-white/90 uppercase tracking-widest text-[10px] sm:col-span-1 sm:w-auto"
+                  disabled={selection.isBatchUpdating || selection.isBatchDeleting || categoryOptionsDisabled}
+                  onClick={() => void selection.batchSetCategory()}
+                  className="min-h-11 bg-white text-black hover:bg-white/90 uppercase tracking-widest text-[10px]"
                 >
-                  {isBatchUpdating ? 'Applying…' : 'Set category'}
+                  {selection.isBatchUpdating ? 'Applying…' : 'Set category'}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={isBatchDeleting || isBatchUpdating}
-                  onClick={() => void handleBatchDelete()}
+                  disabled={selection.isBatchDeleting || selection.isBatchUpdating}
+                  onClick={() => void selection.batchDelete()}
                   className="min-h-11 border-red-500/40 text-red-400 hover:border-red-500/60 hover:bg-red-500/10 uppercase tracking-widest text-[10px]"
                 >
                   <Trash2 size={14} className="mr-1 inline" aria-hidden />
-                  {isBatchDeleting ? 'Deleting…' : 'Delete'}
+                  {selection.isBatchDeleting ? 'Deleting…' : 'Delete'}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  disabled={isBatchDeleting || isBatchUpdating}
-                  onClick={handleClearSelection}
+                  disabled={selection.isBatchDeleting || selection.isBatchUpdating}
+                  onClick={selection.clear}
                   className="min-h-11 text-[10px] uppercase tracking-widest text-white/50"
                 >
                   Clear
@@ -554,115 +285,207 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
             </div>
           )}
         </CardHeader>
+
         <CardContent className="p-0">
-          {isLoadingPhotos ? (
+          {data.isLoadingPhotos ? (
             <p className="p-6 text-sm text-white/40 uppercase tracking-widest text-center">Loading…</p>
-          ) : photos.length === 0 ? (
+          ) : data.photos.length === 0 ? (
             <p className="p-6 text-sm text-white/40 uppercase tracking-widest text-center">
               No photos yet. Add one above.
             </p>
           ) : (
             <>
-              <div className="flex items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-2.5">
-                <Checkbox
-                  ref={selectAllRef}
-                  checked={allPhotosSelected}
-                  onChange={handleToggleAllPhotos}
-                  disabled={photos.length === 0}
-                  className="h-5 w-5"
-                  aria-label="Select all photos"
-                />
-                <span className="text-[10px] uppercase tracking-widest text-white/50">Select all</span>
-              </div>
-
-              <div className="p-2 sm:p-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {photos.map((photo) => {
-                    const selected = selectedPhotoIds.includes(photo.id);
-                    const isNew = photo.id === newlyAddedPhotoId;
-                    return (
-                      <article
-                        key={photo.id}
-                        className={`relative aspect-3/4 overflow-hidden rounded-lg border bg-black/40 transition-colors ${
-                          selected ? 'border-white/40 ring-1 ring-white/30' : 'border-white/10'
-                        } ${isNew ? 'animate-photo-enter' : ''}`}
-                      >
-                        <img
-                          src={photo.url}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div
-                          className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-black/20"
-                          aria-hidden
-                        />
-                        <label className="absolute left-1 top-1 z-10 flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md">
-                          <Checkbox
-                            checked={selected}
-                            onChange={() => handleTogglePhoto(photo.id)}
-                            className="h-5 w-5"
-                            aria-label={`Select ${photo.title}`}
-                          />
-                        </label>
-                        <div className="absolute right-0.5 top-1 z-10 flex flex-col gap-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => handleOpenDetails(photo)}
-                            className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-white/15 hover:text-white"
-                            aria-label={`Edit title and category for ${photo.title}`}
-                          >
-                            <FilePenLine size={18} aria-hidden />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => setEditingPhotoUrl(photo.url)}
-                            className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-white/15 hover:text-white"
-                            aria-label={`Open image editor for ${photo.title}`}
-                          >
-                            <Pencil size={18} aria-hidden />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            type="button"
-                            onClick={() => void handleDelete(photo.id)}
-                            className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-red-500/20 hover:text-red-300"
-                            aria-label={`Delete ${photo.title}`}
-                          >
-                            <Trash2 size={18} aria-hidden />
-                          </Button>
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 z-10 p-2 pt-6">
-                          <p className="line-clamp-2 text-[10px] font-light uppercase leading-tight tracking-wider text-white drop-shadow-md">
-                            {photo.title}
-                          </p>
-                          <p className="mt-0.5 truncate text-[9px] uppercase tracking-wider text-white/75 drop-shadow">
-                            {photo.categoryLabel}
-                          </p>
-                          <p className="mt-0.5 font-mono text-[9px] text-white/55 drop-shadow">#{photo.order}</p>
-                        </div>
-                      </article>
-                    );
-                  })}
+              {!view.stackedView && (
+                <div className="flex items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-2.5">
+                  <Checkbox
+                    ref={selection.selectAllRef}
+                    checked={selection.allSelected}
+                    onChange={selection.toggleAll}
+                    disabled={data.photos.length === 0}
+                    className="h-5 w-5"
+                    aria-label="Select all photos"
+                  />
+                  <span className="text-[10px] uppercase tracking-widest text-white/50">Select all</span>
                 </div>
-              </div>
+              )}
 
+              {/* ── Stacked view ── */}
+              {view.stackedView && (
+                <div className="p-4 sm:p-6">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {view.categorizedPhotos.map((group, groupIdx) => {
+                      const allSelected  = group.photos.every((p) => selection.selectedIds.includes(p.id));
+                      const someSelected = group.photos.some((p) => selection.selectedIds.includes(p.id));
+                      const stackCards   = group.photos.slice(0, 4).reverse();
+                      const rotations    = [-5, 3, -1.5, 0];
+                      const offsets      = [-8, -4, -2, 0];
+                      return (
+                        <div
+                          key={group.categoryId}
+                          className="animate-stack-in flex flex-col gap-3"
+                          style={{ animationDelay: `${groupIdx * 0.07}s` }}
+                        >
+                          <div className="group/stack relative aspect-3/4 rounded-lg p-[8px]">
+                            <div
+                              aria-hidden
+                              className={`animate-gradient-spin absolute inset-0 rounded-lg blur-[5px] transition-opacity duration-500 ${
+                                allSelected ? 'opacity-100' : someSelected ? 'opacity-60' : 'opacity-0 group-hover/stack:opacity-30'
+                              }`}
+                              style={{
+                                background: `conic-gradient(from calc(var(--gradient-angle) + 335deg), transparent 0deg, oklch(52.74% 0.21 281.43deg) 30deg, oklch(73.91% 0.22 322.89deg) 60deg, transparent 100deg, transparent 360deg)`,
+                                filter: 'blur(20px)',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => selection.toggleCategoryGroup(group.photos)}
+                              className="relative h-full w-full cursor-pointer"
+                              aria-label={`${allSelected ? 'Deselect' : 'Select'} all in ${group.categoryLabel}`}
+                            >
+                              {stackCards.map((photo, i) => (
+                                <div
+                                  key={photo.id}
+                                  className="absolute inset-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 transition-transform duration-300 group-hover/stack:duration-200"
+                                  style={{
+                                    transform: `rotate(${rotations[i]}deg) translateY(${offsets[i]}px)`,
+                                    zIndex: i + 1,
+                                    transitionDelay: `${i * 20}ms`,
+                                  }}
+                                >
+                                  <img
+                                    src={photo.url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                              ))}
+                              <div className="absolute bottom-2 right-2 z-20 rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-medium uppercase tracking-widest text-white/70 backdrop-blur-sm">
+                                {group.photos.length}
+                              </div>
+                            </button>
+                          </div>
+                          <div>
+                            <p className={`truncate text-[10px] uppercase tracking-widest transition-colors ${allSelected ? 'text-white' : 'text-white/60'}`}>
+                              {group.categoryLabel}
+                            </p>
+                            <p className="text-[9px] text-white/30">
+                              {group.photos.length} {group.photos.length === 1 ? 'photo' : 'photos'}
+                              {someSelected && !allSelected && (
+                                ` · ${group.photos.filter((p) => selection.selectedIds.includes(p.id)).length} selected`
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Grid view ── */}
+              {!view.stackedView && (
+                <div className="p-2 sm:p-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {data.photos.map((photo) => {
+                      const selected = selection.selectedIds.includes(photo.id);
+                      const isNew    = photo.id === newPhoto.newlyAddedPhotoId;
+                      return (
+                        <article
+                          key={photo.id}
+                          className={`group relative aspect-3/4 rounded-lg p-[2px] ${isNew ? 'animate-photo-enter' : ''}`}
+                        >
+                          <div
+                            aria-hidden
+                            className="animate-gradient-spin absolute inset-0 rounded-lg opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                            style={{
+                              background: `conic-gradient(from calc(var(--gradient-angle) + 335deg), transparent 0deg, oklch(89.62% 0.16 184.25deg) 30deg, oklch(88.7% 0.25 138.31deg) 60deg, transparent 100deg, transparent 360deg)`,
+                              filter: 'blur(10px)',
+                            }}
+                          />
+                          <div
+                            className={`relative h-full overflow-hidden rounded-[calc(0.5rem-2px)] border bg-black/40 transition-colors ${
+                              selected ? 'border-white/40 ring-1 ring-white/30' : 'border-white/10'
+                            }`}
+                          >
+                            <img
+                              src={photo.url}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 bg-linear-to-t from-black via-black/50 to-black/20" aria-hidden />
+
+                            <label className="absolute left-1 top-1 z-10 flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md">
+                              <Checkbox
+                                checked={selected}
+                                onChange={() => selection.toggle(photo.id)}
+                                className="h-5 w-5"
+                                aria-label={`Select ${photo.title}`}
+                              />
+                            </label>
+
+                            <div className="absolute right-0.5 top-1 z-10 flex flex-col gap-0.5">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                onClick={() => details.open(photo)}
+                                className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-white/15 hover:text-white"
+                                aria-label={`Edit title and category for ${photo.title}`}
+                              >
+                                <FilePenLine size={18} aria-hidden />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                onClick={() => setEditingPhotoUrl(photo.url)}
+                                className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-white/15 hover:text-white"
+                                aria-label={`Open image editor for ${photo.title}`}
+                              >
+                                <Pencil size={18} aria-hidden />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                type="button"
+                                onClick={() => void selection.deletePhoto(photo.id)}
+                                className="size-10 min-h-11 min-w-11 text-white/90 hover:bg-red-500/20 hover:text-red-300"
+                                aria-label={`Delete ${photo.title}`}
+                              >
+                                <Trash2 size={18} aria-hidden />
+                              </Button>
+                            </div>
+
+                            <div className="absolute bottom-0 left-0 right-0 z-10 p-2 pt-6">
+                              <p className="line-clamp-2 text-[10px] font-light uppercase leading-tight tracking-wider text-white drop-shadow-md">
+                                {photo.title}
+                              </p>
+                              <p className="mt-0.5 truncate text-[9px] uppercase tracking-wider text-white/75 drop-shadow">
+                                {photo.categoryLabel}
+                              </p>
+                              <p className="mt-0.5 font-mono text-[9px] text-white/55 drop-shadow">#{photo.order}</p>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={detailsPhoto !== null} onOpenChange={(open) => !open && handleCloseDetails()}>
+      {/* ── Edit details dialog ── */}
+      <Dialog open={details.detailsPhoto !== null} onOpenChange={(open) => !open && details.close()}>
         <DialogContent
           className="max-h-[85dvh] overflow-y-auto overflow-x-hidden border-white/10 bg-neutral-950 text-white sm:max-w-md"
           showCloseButton
         >
-          <form onSubmit={handleSaveDetails} className="space-y-4">
+          <form onSubmit={(e) => void details.save(e)} className="space-y-4">
             <DialogHeader>
               <DialogTitle className="font-light uppercase tracking-[0.2em] text-white">
                 Edit details
@@ -677,8 +500,8 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               </Label>
               <Input
                 id="details-title"
-                value={detailsTitle}
-                onChange={(e) => setDetailsTitle(e.target.value)}
+                value={details.detailsTitle}
+                onChange={(e) => details.setDetailsTitle(e.target.value)}
                 required
                 className="border-white/10 bg-black/40 focus:border-white/40"
               />
@@ -686,12 +509,12 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
             <CategoryPicker
               id="details-category"
               label="Category"
-              categories={categories}
-              value={detailsCategoryId}
-              onChange={setDetailsCategoryId}
-              onCreate={createCategoryFromLabel}
+              categories={data.categories}
+              value={details.detailsCategoryId}
+              onChange={details.setDetailsCategoryId}
+              onCreate={data.createCategoryFromLabel}
               disabled={categoryOptionsDisabled}
-              isCreating={isSavingCategory}
+              isCreating={data.isSavingCategory}
             />
             <div className="space-y-2">
               <Label htmlFor="details-order" className="text-[10px] uppercase tracking-widest text-white/40">
@@ -700,27 +523,18 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
               <Input
                 id="details-order"
                 type="number"
-                value={detailsOrder}
-                onChange={(e) => setDetailsOrder(parseInt(e.target.value, 10) || 0)}
+                value={details.detailsOrder}
+                onChange={(e) => details.setDetailsOrder(parseInt(e.target.value, 10) || 0)}
                 required
                 className="border-white/10 bg-black/40 focus:border-white/40"
               />
             </div>
             <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-white/60 hover:text-white"
-                onClick={handleCloseDetails}
-              >
+              <Button type="button" variant="ghost" className="text-white/60 hover:text-white" onClick={details.close}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSavingDetails}
-                className="bg-white text-black hover:bg-white/90"
-              >
-                {isSavingDetails ? 'Saving…' : 'Save'}
+              <Button type="submit" disabled={details.isSaving} className="bg-white text-black hover:bg-white/90">
+                {details.isSaving ? 'Saving…' : 'Save'}
               </Button>
             </div>
           </form>
@@ -728,10 +542,7 @@ export const Admin = ({ isAuthenticated, onLogin, onLogout }: AdminProps) => {
       </Dialog>
 
       {editingPhotoUrl && (
-        <PhotoEditor
-          imageUrl={editingPhotoUrl}
-          onClose={() => setEditingPhotoUrl(null)}
-        />
+        <PhotoEditor imageUrl={editingPhotoUrl} onClose={() => setEditingPhotoUrl(null)} />
       )}
     </div>
   );
